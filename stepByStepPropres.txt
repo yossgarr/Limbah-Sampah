@@ -1,0 +1,8 @@
+install
+
+backend
+- fiber (Golang)
+
+frontend
+- vite (React)
+- tailwind
