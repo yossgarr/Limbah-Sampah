@@ -3,6 +3,14 @@ install
 backend
 - fiber (Golang)
 
+libray
+- Golang-migrate(Github)
+- GodotEnv
+___________________________________________________________________________--
+
 frontend
 - vite (React)
 - tailwind
+
+libray
+- react-router-dom

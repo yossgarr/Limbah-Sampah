@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS waste_reports;
+DROP TABLE IF EXISTS factors;
+DROP TABLE IF EXISTS factor_sets;
+DROP TABLE IF EXISTS users;
+DROP TYPE IF EXISTS user_role;
+DROP TYPE IF EXISTS auth_source_type;
