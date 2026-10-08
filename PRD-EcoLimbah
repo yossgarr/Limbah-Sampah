@@ -1,0 +1,107 @@
+# ROADMAP: Peta Jalan Pengembangan EcoLimbah
+
+| Document Detail | Value |
+| :--- | :--- |
+| **Project Name** | EcoLimbah |
+| **Document Type** | Development Roadmap (20 Milestones) |
+| **Target Architecture** | Go Fiber, PostgreSQL (Neon Tech), React TypeScript, Tailwind CSS |
+| **Status** | Active Planning |
+
+---
+
+## Phase 1: Core Foundation & CRUD Operations
+
+### Milestone 1: CRUD & Validasi Form Laporan Limbah
+* **Backend:** Buat endpoint `POST`, `PUT`, dan `DELETE` pada `/api/v1/waste-reports` lengkap dengan validasi batas jumlah dan tanggal di server-side.
+* **Frontend:** Buat komponen modal form untuk tambah dan edit laporan limbah dengan validasi form serta konfirmasi hapus data.
+
+### Milestone 2: Autentikasi JWT & Integrasi Keycloak SSO
+* **Backend:** Implementasikan generasi token JWT pada rute `/auth/login-external` berbasis hash Argon2id dan selesaikan rute callback OAuth2 Keycloak.
+* **Frontend:** Buat penanganan token JWT di penyimpanan lokal dan tambahkan HTTP interceptor untuk menyisipkan header otorisasi Bearer token secara otomatis.
+
+### Milestone 3: Hak Akses Berbasis Peran (RBAC)
+* **Backend:** Buat middleware validasi klaim peran dari JWT untuk membatasi akses rute sensitif.
+* **Frontend:** Kondisikan antarmuka berdasarkan peran pengguna (Pegawai hanya melihat data sendiri, Observer melihat semua data secara *read-only*, dan Admin memiliki akses penuh).
+
+### Milestone 4: Engine Kalkulasi & Master Data Kategori Limbah
+* **Backend:** Buat tabel `waste_categories` dan fungsi kalkulasi dinamis `result_total = input_amount * factor_value` saat penyimpanan data.
+* **Frontend:** Buat halaman khusus Admin untuk mengelola jenis limbah dan faktor konversi tanpa *hardcode*.
+
+---
+
+## Phase 2: Data Enrichment & Data Visualization
+
+### Milestone 5: Upload & Manajemen Bukti Penimbangan
+* **Backend:** Integrasikan media penyimpanan awan untuk menerima unggahan file foto dan menyimpan URL pada kolom `evidence_url`.
+* **Frontend:** Tambahkan kolom unggah gambar pada form laporan beserta pratinjau foto dan modal *viewer* pada tabel.
+
+### Milestone 6: Dashboard Analitik Visual & Filter Interaktif
+* **Backend:** Buat endpoint agregasi data `/api/v1/waste-reports/stats` untuk grafik volume bulanan dan persentase kategori.
+* **Frontend:** Visualisasikan data menggunakan library grafik Recharts serta filter berdasarkan rentang tanggal, kategori, dan unit kerja.
+
+### Milestone 7: Sistem Poin & Katalog Penukaran Insentif (Gamifikasi)
+* **Backend:** Buat skema `reward_catalog` dan transaksi pemotongan poin saat penukaran insentif.
+* **Frontend:** Buat halaman katalog insentif yang menampilkan sisa poin pengguna, daftar hadiah, dan riwayat klaim.
+
+### Milestone 8: Ekspor Laporan & Dokumentasi Audit (PDF/Excel)
+* **Backend:** Buat generator file spreadsheet `.xlsx` dan dokumen `.pdf` berdasarkan filter data yang dipilih.
+* **Frontend:** Sediakan tombol unduh laporan dengan indikator status pemrosesan file.
+
+---
+
+## Phase 3: Operations, Engagement & Workflow Management
+
+### Milestone 9: Audit Log & Sistem Notifikasi Email
+* **Backend:** Buat tabel `audit_logs` untuk mencatat aktivitas mutasi data dan integrasi layanan SMTP untuk email konfirmasi.
+* **Frontend:** Tambahkan panel notifikasi pada bagian header untuk menampilkan pembaruan status laporan.
+
+### Milestone 10: Progressive Web App (PWA) & Akses Offline
+* **Backend:** Optimalkan ukuran respons API untuk transmisi data cepat.
+* **Frontend:** Konfigurasikan Service Worker dan Manifest agar aplikasi dapat diinstal di perangkat seluler serta mendukung pengisian form saat offline.
+
+### Milestone 11: Real-time Notifications via WebSockets
+* **Backend:** Implementasikan Fiber WebSockets untuk menyiarkan pembaruan data secara langsung saat ada laporan baru.
+* **Frontend:** Hubungkan WebSocket di React untuk memperbarui grafik dan tabel tanpa perlu pembaruan halaman secara manual.
+
+### Milestone 12: Multi-Tenant & Isolasi Data Satuan Kerja
+* **Backend:** Tambahkan isolasi data berbasis pengenal unit kerja pada setiap query database untuk memastikan keamanan data antar instansi.
+* **Frontend:** Sediakan opsi kustomisasi logo dan tema visual sesuai unit kerja yang sedang aktif.
+
+---
+
+## Phase 4: GIS, Governance & Community Features
+
+### Milestone 13: Geolokasi & Pemetaan Tempat Pembuangan (GIS Integration)
+* **Backend:** Simpan koordinat titik lokasi pengumpulan sampah pada tabel laporan.
+* **Frontend:** Integrasikan peta interaktif untuk memvisualisasikan sebaran titik pengumpulan limbah secara teritorial.
+
+### Milestone 14: Modul Approval & Rekonsiliasi Laporan (Verifikasi Berjenjang)
+* **Backend:** Buat status laporan (`pending`, `approved`, `rejected`) dan rute API khusus bagi Supervisor/Admin untuk menyetujui atau menolak input laporan manual dari Pegawai sebelum poin dicairkan.
+* **Frontend:** Tambahkan halaman antrean *approval* laporan untuk Admin/Supervisor lengkap dengan alasan penolakan jika data tidak valid.
+
+### Milestone 15: Sistem Target, Badge & Sertifikat Digital (E-Certificate)
+* **Backend:** Generator file PDF otomatis untuk mencetak sertifikat apresiasi atas pencapaian batas volume sampah tertentu.
+* **Frontend:** Tampilkan bar progres target bulanan unit kerja dan tombol *download* sertifikat kontribusi lingkungan.
+
+### Milestone 16: Leaderboard & Fitur Sosial Antar Unit
+* **Backend:** Buat endpoint kalkulasi peringkat unit kerja dan pegawai dengan akumulasi daur ulang tertinggi.
+* **Frontend:** Tampilkan halaman papan peringkat bulanan lengkap dengan sistem lencana penghargaan.
+
+---
+
+## Phase 5: Knowledge Base, Security & Production Readiness
+
+### Milestone 17: Pusat Edukasi & Panduan Pemilahan Sampah (Knowledge Base)
+* **Backend:** Buat tabel master data untuk modul edukasi, kategori limbah yang dapat didaur ulang, serta tips pengolahan.
+* **Frontend:** Tampilkan halaman direktori panduan pemilahan sampah interaktif yang mudah dicari oleh pengguna.
+
+### Milestone 18: Keamanan Tingkat Lanjut & Proteksi API
+* **Backend:** Terapkan middleware pembatas laju permintaan (*rate limiter*), aturan CORS ketat, dan sanitasi input untuk mencegah SQL Injection dan XSS.
+* **Frontend:** Amankan penyimpanan token sesi dan terapkan proteksi terhadap serangan CSRF.
+
+### Milestone 19: Observability & Monitoring Server
+* **Backend:** Integrasikan Prometheus dan Grafana untuk memantau penggunaan resource server Go Fiber serta latensi database.
+* **Frontend:** Pasang pelacak error client-side menggunakan Sentry untuk mendeteksi bug pada perangkat pengguna secara otomatis.
+
+### Milestone 20: Automated CI/CD Pipeline & Deployment Produksi
+* **
