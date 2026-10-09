@@ -22,7 +22,8 @@ export const Login: React.FC = () => {
         // Simpan sesi login
         localStorage.setItem('access_token', data.access_token);
         localStorage.setItem('user_role', data.role);
-        localStorage.setItem('user_email', email);
+        localStorage.setItem('user_email', data.email);
+        localStorage.setItem('user_id', data.user_id);
 
         // Redirect langsung ke Dashboard
         navigate('/dashboard');

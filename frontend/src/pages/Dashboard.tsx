@@ -15,33 +15,72 @@ interface FormState {
   activity_date: string;
 }
 
-const API_BASE_URL = 'http://localhost:8080/api/v1/waste-reports';
+interface FactorOption {
+  category_code: string;
+  name: string;
+  value: number;
+  unit: string;
+}
+
+const API_URL = 'http://localhost:8080/api/v1';
+const API_BASE_URL = `${API_URL}/waste-reports`;
+
+// Harus sama dengan batas di backend (report_handler.go)
+const MAX_AMOUNT_KG = 1000;
+const MAX_BACKDATE_DAYS = 365;
+
+const todayString =() => new Date().toISOString().split('T')[0];
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [reports, setReports] = useState<WasteReport[]>([]);
+  const [factors, setFactors] = useState<FactorOption[]>([]);
   const [loading, setLoading] = useState(true);
 
   // State Modal & Form
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormState>({
-    category_code: 'PLASTIK',
+    category_code: '',
     input_amount: '',
-    activity_date: new Date().toISOString().split('T')[0],
+    activity_date: todayString(),
   });
   const [formError, setFormError] = useState<string | null>(null);
 
   const userRole = localStorage.getItem('user_role') || 'user';
   const userEmail = localStorage.getItem('user_email') || 'User EcoLimbah';
+  const canWrite = userRole !== 'observer';
+
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate('/login');
+  };
+
+  // fetch dengan token; sesi habis / tidak valid -> kembali ke login
+  const authFetch = async (url: string, init: RequestInit = {}) => {
+    const res = await fetch(url, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+      },
+    });
+    if (res.status === 401) {
+      handleLogout();
+      throw new Error('Sesi berakhir, silakan login kembali');
+    }
+    return res;
+  };
+
+  const categoryName = (code: string) => factors.find((f) => f.category_code === code)?.name ?? code;
 
   // Fetch Data dari API Go Fiber
   const fetchReports = () => {
     setLoading(true);
-    fetch(API_BASE_URL)
+    authFetch(API_BASE_URL)
       .then((res) => res.json())
       .then((data) => {
-        setReports(data || []);
+        setReports(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch((err) => {
@@ -52,20 +91,20 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => {
     fetchReports();
+    authFetch(`${API_URL}/factors`)
+      .then((res) => res.json())
+      .then((data) => setFactors(Array.isArray(data) ? data : []))
+      .catch((err) => console.error('Gagal mengambil kategori:', err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate('/login');
-  };
 
   // Buka Modal Mode Tambah
   const handleOpenCreateModal = () => {
     setEditingId(null);
     setFormData({
-      category_code: 'PLASTIK',
+      category_code: factors[0]?.category_code ?? '',
       input_amount: '',
-      activity_date: new Date().toISOString().split('T')[0],
+      activity_date: todayString(),
     });
     setFormError(null);
     setIsModalOpen(true);
@@ -88,17 +127,36 @@ export const Dashboard: React.FC = () => {
     e.preventDefault();
     setFormError(null);
 
+    if (!formData.category_code) {
+      setFormError('Kategori limbah wajib dipilih');
+      return;
+    }
+
     const amount = parseFloat(formData.input_amount);
     if (isNaN(amount) || amount <= 0) {
       setFormError('Jumlah sampah harus lebih dari 0 kg');
+      return;
+    }
+    if (amount > MAX_AMOUNT_KG) {
+      setFormError(`Jumlah sampah maksimal ${MAX_AMOUNT_KG} kg per laporan`);
       return;
     }
 
     const selectedDate = new Date(formData.activity_date);
     const today = new Date();
     today.setHours(23, 59, 59, 999);
+    if (isNaN(selectedDate.getTime())) {
+      setFormError('Tanggal wajib diisi');
+      return;
+    }
     if (selectedDate > today) {
       setFormError('Tanggal laporan tidak boleh di masa depan');
+      return;
+    }
+    const earliest = new Date();
+    earliest.setDate(earliest.getDate() - MAX_BACKDATE_DAYS);
+    if (selectedDate < earliest) {
+      setFormError(`Tanggal laporan tidak boleh lebih dari ${MAX_BACKDATE_DAYS} hari ke belakang`);
       return;
     }
 
@@ -107,9 +165,8 @@ export const Dashboard: React.FC = () => {
       const url = isEdit ? `${API_BASE_URL}/${editingId}` : API_BASE_URL;
       const method = isEdit ? 'PUT' : 'POST';
 
-      const response = await fetch(url, {
+      const response = await authFetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           category_code: formData.category_code,
           input_amount: amount,
@@ -132,7 +189,7 @@ export const Dashboard: React.FC = () => {
     if (!window.confirm('Apakah Anda yakin ingin menghapus laporan ini?')) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/${id}`, {
+      const response = await authFetch(`${API_BASE_URL}/${id}`, {
         method: 'DELETE',
       });
 
@@ -186,12 +243,15 @@ export const Dashboard: React.FC = () => {
       <div style={{ border: '1px solid #e5e7eb', padding: '24px', borderRadius: '8px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h2>Riwayat Laporan Limbah (Realtime Neon DB)</h2>
-          <button
-            onClick={handleOpenCreateModal}
-            style={{ padding: '8px 16px', backgroundColor: '#059669', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-          >
-            + Tambah Laporan
-          </button>
+          {canWrite && (
+            <button
+              onClick={handleOpenCreateModal}
+              disabled={factors.length === 0}
+              style={{ padding: '8px 16px', backgroundColor: '#059669', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              + Tambah Laporan
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -204,37 +264,39 @@ export const Dashboard: React.FC = () => {
                 <th style={{ padding: '8px', border: '1px solid #ddd' }}>Jumlah (Kg)</th>
                 <th style={{ padding: '8px', border: '1px solid #ddd' }}>Poin Ditambah</th>
                 <th style={{ padding: '8px', border: '1px solid #ddd' }}>Tanggal</th>
-                <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'center' }}>Aksi</th>
+                {canWrite && <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'center' }}>Aksi</th>}
               </tr>
             </thead>
             <tbody>
               {reports.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '16px', textAlign: 'center', color: '#6b7280' }}>
+                  <td colSpan={canWrite ? 5 : 4} style={{ padding: '16px', textAlign: 'center', color: '#6b7280' }}>
                     Belum ada laporan limbah.
                   </td>
                 </tr>
               ) : (
                 reports.map((item) => (
                   <tr key={item.id}>
-                    <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.category_code}</td>
+                    <td style={{ padding: '8px', border: '1px solid #ddd' }}>{categoryName(item.category_code)}</td>
                     <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.input_amount}</td>
                     <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.result_total}</td>
                     <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.activity_date.split('T')[0]}</td>
-                    <td style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'center' }}>
-                      <button
-                        onClick={() => handleOpenEditModal(item)}
-                        style={{ padding: '4px 8px', marginRight: '8px', backgroundColor: '#d97706', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        style={{ padding: '4px 8px', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                      >
-                        Hapus
-                      </button>
-                    </td>
+                    {canWrite && (
+                      <td style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'center' }}>
+                        <button
+                          onClick={() => handleOpenEditModal(item)}
+                          style={{ padding: '4px 8px', marginRight: '8px', backgroundColor: '#d97706', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          style={{ padding: '4px 8px', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                          Hapus
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -266,11 +328,11 @@ export const Dashboard: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, category_code: e.target.value })}
                   style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
                 >
-                  <option value="PLASTIK">Plastik</option>
-                  <option value="KERTAS">Kertas / Karton</option>
-                  <option value="ORGANIK">Organik</option>
-                  <option value="B3">Limbah B3</option>
-                  <option value="LOGAM">Logam</option>
+                  {factors.map((f) => (
+                    <option key={f.category_code} value={f.category_code}>
+                      {f.name} ({f.category_code})
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -279,6 +341,8 @@ export const Dashboard: React.FC = () => {
                 <input
                   type="number"
                   step="0.01"
+                  min="0.01"
+                  max={MAX_AMOUNT_KG}
                   placeholder="Contoh: 5.5"
                   value={formData.input_amount}
                   onChange={(e) => setFormData({ ...formData, input_amount: e.target.value })}
